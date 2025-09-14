@@ -70,6 +70,15 @@ namespace ISO20022.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to the resource {0} does not contain a valid XSD and has been ignored.
+        /// </summary>
+        internal static string ErrorInvalidXSDResource {
+            get {
+                return ResourceManager.GetString("ErrorInvalidXSDResource", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to no data to deserialize.
         /// </summary>
         internal static string ErrorNoDataToDeserialize {

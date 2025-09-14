@@ -132,4 +132,7 @@
   <data name="ErrorNoDataToDeserialize" xml:space="preserve">
     <value>no data to deserialize</value>
   </data>
+  <data name="ErrorInvalidXSDResource" xml:space="preserve">
+    <value>the resource {0} does not contain a valid XSD and has been ignored</value>
+  </data>
 </root>

@@ -12,18 +12,6 @@ using System.Collections.ObjectModel;
 
 namespace ISO20022
 {
-	#region exceptions
-	/// <summary>
-	/// excaption raised when an invalid value is assigned to an enumerated variable
-	/// </summary>
-	public class ISO20022XmlSchemaValiderException : Exception
-	{
-		public ISO20022XmlSchemaValiderException(IList<ValidationEventArgs> t) { Evts = t; }
-		IList<ValidationEventArgs> Evts;
-		public
-	}
-	#endregion
-
 	/// <summary>
 	/// Object allowing to load a complete XML schema with multiple files and to validate an XML
 	/// </summary>
@@ -49,21 +37,36 @@ namespace ISO20022
 		/// </summary>
 		public IEnumerable<ValidationEventArgs> ErrorEvents { get => _validationEvents.Where(severity => XmlSeverityType.Error == severity.Severity); }
 		/// <summary>
+		/// The number of errors while verifying a XML file
+		/// </summary>
+		public int NbErrors { get => _validationEvents.Count(severity => XmlSeverityType.Error == severity.Severity); }
+		/// <summary>
 		/// List of warnings while verifying a XML file
 		/// </summary>
 		public IEnumerable<ValidationEventArgs> WarningEvents { get => _validationEvents.Where(severity => XmlSeverityType.Warning == severity.Severity); }
+		/// <summary>
+		/// The number of warnings while verifying a XML file
+		/// </summary>
+		public int NbWarnings { get => _validationEvents.Count(severity => XmlSeverityType.Warning == severity.Severity); }
 		#endregion
 
 		#region public XML specific methods
 		/// <summary>
-		/// Reste the schema set to restart with another set of XSD
+		/// Reset the schema set to restart with another set of XSD
 		/// </summary>
 		public void ResetXmlSchemaSet()
 		{
 			_xmlSchemaSet = new XmlSchemaSet();
 			_validationEvents.Clear();
 		}
-#if RESOURCES
+		/// <summary>
+		/// Loads the specified array of XSD stored in resources pointed by <paramref name="resources"/> and stored as string.
+		/// If <paramref name="xsds"/> is null or empty the function tries to read all string resources from the <paramref name="resources"/>.
+		/// </summary>
+		/// <param name="resources">Resources to look into</param>
+		/// <param name="xsds">Array of names of resources containing XSD to load from resources</param>
+		/// <returns>true if the XSD have been loaded without error and warning, false otherwise</returns>
+		public bool LoadAndSetXSD(ResourceManager resources, string[] xsds) => LoadAndSetXSD(resources, new List<string>(xsds));
 		/// <summary>
 		/// Loads the specified list of XSD stored in resources pointed by <paramref name="resources"/> and stored as string.
 		/// If <paramref name="xsds"/> is null or empty the function tries to read all string resources from the <paramref name="resources"/>.
@@ -78,14 +81,13 @@ namespace ISO20022
 				if (default == resources) return false;
 				ResourceSet resourceSet = resources.GetResourceSet(CultureInfo.CurrentCulture, true, true);
 				if (default == resourceSet) return false;
-				XmlSchemaSet = new XmlSchemaSet();
 				bool ok = true;
 				if (default == xsds || 0 == xsds.Count)
 					foreach (DictionaryEntry entry in resourceSet)
-						ok &= loadAndSetXSD(resources, entry.Key.ToString());
+						ok &= LoadAndSetXSD(resources, entry.Key.ToString());
 				else
-					foreach (string entry in resourceSet)
-						ok &= loadAndSetXSD(resources, entry);
+					foreach (string entry in xsds)
+						ok &= LoadAndSetXSD(resources, entry);
 				return ok;
 			}
 			catch (Exception ex)
@@ -95,33 +97,23 @@ namespace ISO20022
 			return false;
 		}
 		/// <summary>
-		/// Loads the specified array of XSD stored in resources pointed by <paramref name="resources"/> and stored as string.
-		/// If <paramref name="xsds"/> is null or empty the function tries to read all string resources from the <paramref name="resources"/>.
-		/// </summary>
-		/// <param name="resources">Resources to look into</param>
-		/// <param name="xsds">Array of names of resources containing XSD to load from resources</param>
-		/// <returns>true if the XSD have been loaded without error and warning, false otherwise</returns>
-		public bool LoadAndSetXSD(ResourceManager resources, string[] xsds) => LoadAndSetXSD(resources, new List<string>(xsds));
-		/// <summary>
 		/// Loads the specified XSD
 		/// </summary>
 		/// <param name="resources">Resources to lokk into</param>
 		/// <param name="xsd">Name of the XSD to load</param>
 		/// <returns>true if the XSD has been loaded without error and warning, false otherwise</returns>
-		bool loadAndSetXSD(ResourceManager resources, string xsd)
+		public bool LoadAndSetXSD(ResourceManager resources, string xsd)
 		{
 			try
 			{
-				var byteArray = resources.GetObject(xsd);
-				return loadAndSetXSD(byteArray.ToString());
+				return loadAndSetXSD(resources.GetObject(xsd).ToString());
 			}
 			catch (Exception ex)
 			{
-				CLog.EXCEPT(ex, xsd);
+				CLog.EXCEPT(ex, Resources.ErrorInvalidXSDResource.Format(xsd));
 			}
 			return false;
 		}
-#endif
 		/// <summary>
 		/// Loads the specified list of XSD files
 		/// </summary>
@@ -182,10 +174,7 @@ namespace ISO20022
 			{
 				using (StreamReader sr = new StreamReader(xsd))
 				{
-					var xmlSchema = new XmlSchema();
-					xmlSchema = XmlSchema.Read(sr, null);
-					XmlSchemaSet.Add(xmlSchema);
-					return true;
+					return loadAndSetXSD(sr.ReadToEnd());
 				}
 			}
 			catch (Exception ex)
@@ -195,24 +184,52 @@ namespace ISO20022
 			return false;
 		}
 		/// <summary>
+		/// Loads the specified XSD file
+		/// </summary>
+		/// <param name="xsd">Name of the XSD file to load</param>
+		/// <returns>true if the XSD file has been loaded without error and warning, false otherwise</returns>
+		bool loadAndSetXSD(string xsd)
+		{
+			try
+			{
+				using (StringReader sr = new StringReader(xsd))
+				{
+					var xmlSchema = new XmlSchema();
+					xmlSchema = XmlSchema.Read(sr, null);
+					XmlSchemaSet.Add(xmlSchema);
+					return true;
+				}
+			}
+			catch (Exception) { }
+			return false;
+		}
+		/// <summary>
 		/// Validate a XML message
 		/// </summary>
 		/// <param name="xml">XML message to validate</param>
+		/// <param name="acceptErrors">If errors are encountered and true the XML is validated anyway, if false the XML is not validated</param>
+		/// <param name="acceptWarnings">If warnings are encountered and true the XML is validated anyway, if false the XML is not validated</param>
 		/// <returns>The XML message if valid, an empty string if not. Check properties to determine why</returns>
-		public string ValidateXML(string xml)
+		public string ValidateXML(string xml, bool acceptErrors = false, bool acceptWarnings = false)
 		{
 			XDocument x = XDocument.Parse(xml);
 			try
 			{
-				//x.Validate(XmlSchemaSet, SchemaValidationHandler);
-				x.Validate(XmlSchemaSet, null);
-				return x.ToString();
+				_validationEvents.Clear();
+				x.Validate(XmlSchemaSet, SchemaValidationHandler);
+				if ((0 == NbErrors || acceptErrors)
+					&& (0 == NbWarnings || acceptWarnings))
+					return x.ToString();
 			}
 			catch (Exception ex)
 			{
 				CLog.EXCEPT(ex, xml);
 			}
 			return string.Empty;
+		}
+		void SchemaValidationHandler(object sender, ValidationEventArgs e)
+		{
+			_validationEvents.Add(e);
 		}
 		#endregion
 	}

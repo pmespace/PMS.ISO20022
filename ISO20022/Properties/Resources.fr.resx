@@ -132,4 +132,7 @@
   <data name="ErrorNoDataToDeserialize" xml:space="preserve">
     <value>aucune donnée à désérialiser</value>
   </data>
+  <data name="ErrorInvalidXSDResource" xml:space="preserve">
+    <value>la ressource {0} ne contient pas de XSD valide et a été ignorée</value>
+  </data>
 </root>
