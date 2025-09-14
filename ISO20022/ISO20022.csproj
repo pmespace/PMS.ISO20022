@@ -13,6 +13,8 @@
 		<Authors>PME</Authors>
 		<Description>ISO20022 base core processing</Description>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<TestNugetPath>$(SolutionDir)..\nuget\test</TestNugetPath>
+		<RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -43,15 +45,24 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Using Include="COMMON" />
-	  <Using Include="Newtonsoft.Json" />
+		<Using Include="COMMON" />
+		<Using Include="Newtonsoft.Json" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Update="README.md">
-	    <Pack>True</Pack>
-	    <PackagePath>\</PackagePath>
-	  </None>
+		<None Update="README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
 	</ItemGroup>
+
+	<Target Name="CopyPackage" AfterTargets="Pack">
+		<ItemGroup>
+			<NuSpecFiles Include="$(PackageOutputPath)\*.nupkg" Exclude="$(PackageOutputPath)\$(PackageId).$(PackageVersion).nupkg" />
+		</ItemGroup>
+		<Delete Files="@(NuSpecFiles)" />
+		<MakeDir Directories="$(TestNugetPath)" Condition="!Exists('$(TestNugetPath)')" />
+		<Copy SourceFiles="$(PackageOutputPath)\$(PackageId).$(PackageVersion).nupkg" DestinationFolder="$(TestNugetPath)" />
+	</Target>
 
 </Project>
